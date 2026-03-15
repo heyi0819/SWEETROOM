@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>暖甜間 - 專屬訂購</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        :root {
+            --primary-color: #D4A373; 
+            --bg-color: #FAEDCD; 
+            --text-color: #5E503F; 
+            --white: #FEFAE0;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, '微軟正黑體', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: var(--white);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        p.subtitle {
+            text-align: center;
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        input[type="text"], input[type="tel"], input[type="date"], select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 16px; 
+        }
+        .bagel-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed #eeddbb;
+        }
+        .bagel-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .bagel-name { font-weight: bold; }
+        .bagel-price { font-size: 12px; color: #888; }
+        .quantity-control {
+            display: flex;
+            align-items: center;
+        }
+        .btn-qty {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .qty-input {
+            width: 40px;
+            text-align: center;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .info-box {
+            background-color: #fdf5e6;
+            border-left: 4px solid var(--primary-color);
+            padding: 12px 15px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .info-box p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-color);
+        }
+        .info-box-title {
+            font-weight: bold;
+            margin-bottom: 5px !important;
+        }
+        .total-section {
+            background-color: var(--bg-color);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: right;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .submit-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-top: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(212, 163, 115, 0.3);
+            transition: all 0.3s ease;
+        }
+        .submit-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .submit-btn:active:not(:disabled) { transform: scale(0.98); }
+        #line_user_id { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🥯 暖甜間 專屬訂購</h1>
+    <p class="subtitle">新鮮手作，用心烘焙</p>
+
+    <input type="text" id="line_user_id" value="">
+
+    <div class="form-group">
+        <label>訂購人姓名</label>
+        <input type="text" id="customer_name" placeholder="請輸入姓名" required>
+    </div>
+
+    <div class="form-group">
+        <label>聯絡電話</label>
+        <input type="tel" id="phone" placeholder="0912345678" required>
+    </div>
+
+    <div class="form-group">
+        <label>希望交貨日 (最快為下單後 3 天)</label>
+        <input type="date" id="delivery_date" required>
+    </div>
+
+    <div class="form-group">
+        <label>🥯 選擇口味與數量</label>
+        <div id="menu-container"></div>
+    </div>
+
+    <div class="form-group">
+        <label>取貨方式</label>
+        <select id="shipping_method">
+            <option value="面交">面交</option>
+            <option value="店到店">店到店 (請在備註填寫縣市與門市)</option>
+            <option value="黑貓低溫宅配">黑貓低溫宅配</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>備註 (選填)</label>
+        <textarea id="note" rows="3" placeholder="有任何特殊需求請告訴我們~"></textarea>
+    </div>
+
+    <div class="info-box">
+        <p class="info-box-title">💳 匯款資訊</p>
+        <p>訂單成立後再提供匯款資訊</p>
+    </div>
+
+    <div class="total-section">
+        總金額：$<span id="total_price_display">0</span>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="submitOrder()">送出訂單</button>
+</div>
+
+<script>
+    // 這裡就是你剛剛建立的專屬 API 橋樑網址！
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6GmRc5vhGbwpCruBOVgsRbAJrFZf3GW4m4PAjn_MCV-MvNT--KBo3mXu_5h9TrUTm/exec";
+
+    const menu = [
+        { id: "原味", name: "原味貝果", price: 40 },
+        { id: "巧克力", name: "巧克力貝果", price: 50 },
+        { id: "蔓越莓", name: "蔓越莓貝果", price: 50 },
+        { id: "黑芝麻", name: "黑芝麻貝果", price: 50 },
+        { id: "野生藍莓", name: "野生藍莓貝果", price: 55 },
+        { id: "莓果起司", name: "莓果起司貝果", price: 60 }
+    ];
+
+    window.onload = function() {
+        renderMenu();
+        setupDate();
+        initializeLiff();
+    };
+
+    function initializeLiff() {
+        liff.init({ liffId: "2009466422-vSvBojn2" })
+            .then(() => {
+                if (liff.isLoggedIn()) {
+                    liff.getProfile().then(profile => {
+                        document.getElementById('customer_name').value = profile.displayName;
+                        document.getElementById('line_user_id').value = profile.userId;
+                    });
+                }
+            })
+            .catch((err) => { console.log('LIFF 初始化失敗', err); });
+    }
+
+    function setupDate() {
+        const today = new Date();
+        const minDate = new Date(today);
+        minDate.setDate(minDate.getDate() + 3); 
+        const minDateString = minDate.toISOString().split('T')[0];
+        const dateInput = document.getElementById('delivery_date');
+        dateInput.min = minDateString; 
+        dateInput.value = minDateString; 
+    }
+
+    function renderMenu() {
+        const container = document.getElementById('menu-container');
+        menu.forEach(item => {
+            const html = `
+                <div class="bagel-item">
+                    <div class="bagel-info">
+                        <span class="bagel-name">${item.name}</span>
+                        <span class="bagel-price">$${item.price}</span>
+                    </div>
+                    <div class="quantity-control">
+                        <button class="btn-qty" onclick="changeQty('${item.id}', -1)">-</button>
+                        <input type="text" id="qty_${item.id}" class="qty-input" value="0" readonly>
+                        <button class="btn-qty" onclick="changeQty('${item.id}', 1)">+</button>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += html;
+        });
+    }
+
+    function changeQty(id, delta) {
+        const input = document.getElementById(`qty_${id}`);
+        let currentVal = parseInt(input.value) || 0;
+        let newVal = currentVal + delta;
+        if (newVal < 0) newVal = 0; 
+        input.value = newVal;
+        calculateTotal();
+    }
+
+    function calculateTotal() {
+        let total = 0;
+        menu.forEach(item => {
+            const qty = parseInt(document.getElementById(`qty_${item.id}`).value) || 0;
+            total += qty * item.price;
+        });
+        document.getElementById('total_price_display').innerText = total;
+    }
+
+    function submitOrder() {
+        let totalQty = 0;
+        menu.forEach(item => { totalQty += (parseInt(document.getElementById(`qty_${item.id}`).value) || 0); });
+        
+        if (totalQty === 0) {
+            alert("您還沒有選擇任何貝果喔！");
+            return;
+        }
+        if (!document.getElementById('customer_name').value || !document.getElementById('phone').value) {
+            alert("請填寫姓名與聯絡電話！");
+            return;
+        }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+
+        // 🌟 UX 魔法：每 1.2 秒換一句話，轉移客人注意力
+        const loadingMessages = [
+            "🥯 正在打包您的貝果...", 
+            "📡 呼叫暖甜間店長中...", 
+            "📝 正在寫入訂單資料...", 
+            "✨ 就快要完成囉..."
+        ];
+        let msgIndex = 0;
+        btn.innerText = loadingMessages[msgIndex];
+        
+        const loadingTimer = setInterval(() => {
+            msgIndex++;
+            if(msgIndex < loadingMessages.length) {
+                btn.innerText = loadingMessages[msgIndex];
+            }
+        }, 1200); // 1200毫秒換一次字
+
+        const orderData = {
+            line_user_id: document.getElementById('line_user_id').value,
+            customer_name: document.getElementById('customer_name').value,
+            phone: document.getElementById('phone').value,
+            delivery_date: document.getElementById('delivery_date').value,
+            shipping_method: document.getElementById('shipping_method').value,
+            note: document.getElementById('note').value,
+            flavors: {}
+        };
+        
+        menu.forEach(item => {
+            orderData.flavors[item.id] = parseInt(document.getElementById(`qty_${item.id}`).value) || 0;
+        });
+
+        // 傳送資料到 Google
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(orderData),
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            clearInterval(loadingTimer); // 停止換字
+            if (data.status === "success") {
+                btn.innerText = "✅ 訂單送出成功！";
+                btn.style.backgroundColor = "#4CAF50"; // 按鈕變綠色
+                
+                setTimeout(() => {
+                    alert("🎉 訂單已成功送出！請稍候，我們會盡快與您聯繫。");
+                    if (liff.isLoggedIn()) {
+                        liff.closeWindow();
+                    } else {
+                        window.location.reload();
+                    }
+                }, 500);
+            } else {
+                alert("❌ 傳送失敗，請稍後再試。原因：" + data.message);
+                btn.innerText = "重新送出訂單";
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            clearInterval(loadingTimer);
+            alert("❌ 網路連線發生錯誤，請檢查網路或稍後再試！");
+            console.error('Error:', error);
+            btn.innerText = "重新送出訂單";
+            btn.disabled = false;
+        });
+    }
+</script>
+
+</body>
+</html>
