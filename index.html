@@ -206,11 +206,50 @@
         { id: "莓果起司", name: "莓果起司貝果", price: 60 }
     ];
 
+    // 在原本的 GOOGLE_SCRIPT_URL 下方，更新這段初始化邏輯
+    
     window.onload = function() {
-        renderMenu();
-        setupDate();
-        initializeLiff();
+        // 1. 先把整個表單藏起來，顯示載入中
+        document.querySelector('.container').style.display = 'none';
+        
+        // 建立一個暫時的載入畫面
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading-screen';
+        loadingDiv.innerHTML = '<h2 style="text-align:center; margin-top:50px; color:#D4A373;">🥯 暖甜間連線中...</h2>';
+        document.body.appendChild(loadingDiv);
+
+        // 2. 去問 Google Script 目前商店狀態
+        fetch(GOOGLE_SCRIPT_URL)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading-screen').remove(); // 移除載入畫面
+                
+                if (data.store_status === "營業中") {
+                    // 商店有開！把表單顯示出來並載入功能
+                    document.querySelector('.container').style.display = 'block';
+                    renderMenu();
+                    setupDate();
+                    initializeLiff();
+                } else {
+                    // 商店休息！顯示溫馨公告
+                    const closedDiv = document.createElement('div');
+                    closedDiv.innerHTML = `
+                        <div style="max-width: 400px; margin: 50px auto; text-align: center; background: #FEFAE0; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                            <h1 style="color: #D4A373; margin-bottom: 10px;">🛑 暫停接單中</h1>
+                            <p style="color: #5E503F; font-size: 16px; line-height: 1.5;">
+                                感謝您的支持！<br>目前訂單已滿，或店長正在專心烘焙中。<br>下次開放時間請留意粉絲專頁公告喔！🥯
+                            </p>
+                        </div>
+                    `;
+                    document.body.appendChild(closedDiv);
+                }
+            })
+            .catch(err => {
+                alert("系統連線異常，請稍後再試！");
+            });
     };
+
+    // 下面保留你原本的 initializeLiff, setupDate, renderMenu, changeQty, calculateTotal, submitOrder...
 
     function initializeLiff() {
         liff.init({ liffId: "2009466422-vSvBojn2" })
