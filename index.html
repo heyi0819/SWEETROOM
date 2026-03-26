@@ -209,31 +209,27 @@
     // 在原本的 GOOGLE_SCRIPT_URL 下方，更新這段初始化邏輯
     
     window.onload = function() {
-        // 1. 先把整個表單藏起來，顯示載入中
-        document.querySelector('.container').style.display = 'none';
-        
-        // 建立一個暫時的載入畫面
-        const loadingDiv = document.createElement('div');
-        loadingDiv.id = 'loading-screen';
-        loadingDiv.innerHTML = '<h2 style="text-align:center; margin-top:50px; color:#D4A373;">🥯 暖甜間連線中...</h2>';
-        document.body.appendChild(loadingDiv);
+        // 1. 畫面不隱藏了，直接秒開讓客人看菜單！
+        renderMenu();
+        setupDate();
+        initializeLiff();
 
-        // 2. 去問 Google Script 目前商店狀態
+        // 2. 先把「送出按鈕」鎖起來，顯示確認中，避免客人手速太快偷跑
+        const btn = document.getElementById('submitBtn');
+        btn.innerText = "🔄 確認營業狀態中...";
+        btn.disabled = true;
+
+        // 3. 在背景偷偷去問 Google 鐵捲門有沒有開
         fetch(GOOGLE_SCRIPT_URL)
             .then(response => response.json())
             .then(data => {
-                document.getElementById('loading-screen').remove(); // 移除載入畫面
-                
                 if (data.store_status === "營業中") {
-                    // 商店有開！把表單顯示出來並載入功能
-                    document.querySelector('.container').style.display = 'block';
-                    renderMenu();
-                    setupDate();
-                    initializeLiff();
+                    // 🟢 商店有開！悄悄解鎖按鈕，客人幾乎不會察覺
+                    btn.innerText = "送出訂單";
+                    btn.disabled = false;
                 } else {
-                    // 商店休息！顯示溫馨公告
-                    const closedDiv = document.createElement('div');
-                    closedDiv.innerHTML = `
+                    // 🔴 商店休息！把整個畫面蓋掉，換成溫馨公告
+                    document.body.innerHTML = `
                         <div style="max-width: 400px; margin: 50px auto; text-align: center; background: #FEFAE0; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
                             <h1 style="color: #D4A373; margin-bottom: 10px;">🛑 暫停接單中</h1>
                             <p style="color: #5E503F; font-size: 16px; line-height: 1.5;">
@@ -241,11 +237,13 @@
                             </p>
                         </div>
                     `;
-                    document.body.appendChild(closedDiv);
                 }
             })
             .catch(err => {
-                alert("系統連線異常，請稍後再試！");
+                // 萬一 Google 伺服器稍微卡住，為了不影響做生意，預設解鎖讓客人下單
+                console.log("狀態確認延遲", err);
+                btn.innerText = "送出訂單";
+                btn.disabled = false;
             });
     };
 
