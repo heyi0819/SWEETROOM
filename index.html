@@ -194,87 +194,37 @@
 </div>
 
 <script>
-    // 這裡就是你剛剛建立的專屬 API 橋樑網址！
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6GmRc5vhGbwpCruBOVgsRbAJrFZf3GW4m4PAjn_MCV-MvNT--KBo3mXu_5h9TrUTm/exec";
+  let dynamicMenu = []; // 用來存儲從 Google 抓來的菜單
 
-    const menu = [
-        { id: "原味", name: "原味貝果", price: 40 },
-        { id: "巧克力", name: "巧克力貝果", price: 50 },
-        { id: "蔓越莓", name: "蔓越莓貝果", price: 50 },
-        { id: "黑芝麻", name: "黑芝麻貝果", price: 50 },
-        { id: "野生藍莓", name: "野生藍莓貝果", price: 55 },
-        { id: "莓果起司", name: "莓果起司貝果", price: 60 }
-    ];
-
-    // 在原本的 GOOGLE_SCRIPT_URL 下方，更新這段初始化邏輯
-    
     window.onload = function() {
-        // 1. 畫面不隱藏了，直接秒開讓客人看菜單！
-        renderMenu();
-        setupDate();
-        initializeLiff();
-
-        // 2. 先把「送出按鈕」鎖起來，顯示確認中，避免客人手速太快偷跑
         const btn = document.getElementById('submitBtn');
-        btn.innerText = "🔄 確認營業狀態中...";
+        btn.innerText = "🔄 讀取最新菜單中...";
         btn.disabled = true;
 
-        // 3. 在背景偷偷去問 Google 鐵捲門有沒有開
+        // 向大腦請求目前的菜單和營業狀態
         fetch(GOOGLE_SCRIPT_URL)
             .then(response => response.json())
             .then(data => {
-                if (data.store_status === "營業中") {
-                    // 🟢 商店有開！悄悄解鎖按鈕，客人幾乎不會察覺
-                    btn.innerText = "送出訂單";
-                    btn.disabled = false;
-                } else {
-                    // 🔴 商店休息！把整個畫面蓋掉，換成溫馨公告
-                    document.body.innerHTML = `
-                        <div style="max-width: 400px; margin: 50px auto; text-align: center; background: #FEFAE0; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-                            <h1 style="color: #D4A373; margin-bottom: 10px;">🛑 暫停接單中</h1>
-                            <p style="color: #5E503F; font-size: 16px; line-height: 1.5;">
-                                感謝您的支持！<br>目前訂單已滿，或店長正在專心烘焙中。<br>下次開放時間請留意粉絲專頁公告喔！🥯
-                            </p>
-                        </div>
-                    `;
+                if (data.store_status !== "營業中") {
+                    showClosedMessage();
+                    return;
                 }
-            })
-            .catch(err => {
-                // 萬一 Google 伺服器稍微卡住，為了不影響做生意，預設解鎖讓客人下單
-                console.log("狀態確認延遲", err);
+                
+                // 核心連動：自動畫出菜單
+                dynamicMenu = data.menu; 
+                renderDynamicMenu(dynamicMenu);
+                setupDate();
+                initializeLiff();
+
                 btn.innerText = "送出訂單";
                 btn.disabled = false;
             });
     };
 
-    // 下面保留你原本的 initializeLiff, setupDate, renderMenu, changeQty, calculateTotal, submitOrder...
-
-    function initializeLiff() {
-        liff.init({ liffId: "2009466422-vSvBojn2" })
-            .then(() => {
-                if (liff.isLoggedIn()) {
-                    liff.getProfile().then(profile => {
-                        document.getElementById('customer_name').value = profile.displayName;
-                        document.getElementById('line_user_id').value = profile.userId;
-                    });
-                }
-            })
-            .catch((err) => { console.log('LIFF 初始化失敗', err); });
-    }
-
-    function setupDate() {
-        const today = new Date();
-        const minDate = new Date(today);
-        minDate.setDate(minDate.getDate() + 3); 
-        const minDateString = minDate.toISOString().split('T')[0];
-        const dateInput = document.getElementById('delivery_date');
-        dateInput.min = minDateString; 
-        dateInput.value = minDateString; 
-    }
-
-    function renderMenu() {
+    function renderDynamicMenu(menuItems) {
         const container = document.getElementById('menu-container');
-        menu.forEach(item => {
+        container.innerHTML = ""; // 清空舊的
+        menuItems.forEach(item => {
             const html = `
                 <div class="bagel-item">
                     <div class="bagel-info">
@@ -282,9 +232,9 @@
                         <span class="bagel-price">$${item.price}</span>
                     </div>
                     <div class="quantity-control">
-                        <button class="btn-qty" onclick="changeQty('${item.id}', -1)">-</button>
-                        <input type="text" id="qty_${item.id}" class="qty-input" value="0" readonly>
-                        <button class="btn-qty" onclick="changeQty('${item.id}', 1)">+</button>
+                        <button class="btn-qty" onclick="changeQty('${item.name}', -1)">-</button>
+                        <input type="text" id="qty_${item.name}" class="qty-input" value="0" readonly>
+                        <button class="btn-qty" onclick="changeQty('${item.name}', 1)">+</button>
                     </div>
                 </div>
             `;
@@ -292,108 +242,16 @@
         });
     }
 
-    function changeQty(id, delta) {
-        const input = document.getElementById(`qty_${id}`);
-        let currentVal = parseInt(input.value) || 0;
-        let newVal = currentVal + delta;
-        if (newVal < 0) newVal = 0; 
-        input.value = newVal;
-        calculateTotal();
-    }
-
     function calculateTotal() {
         let total = 0;
-        menu.forEach(item => {
-            const qty = parseInt(document.getElementById(`qty_${item.id}`).value) || 0;
+        dynamicMenu.forEach(item => {
+            const qty = parseInt(document.getElementById(`qty_${item.name}`).value) || 0;
             total += qty * item.price;
         });
         document.getElementById('total_price_display').innerText = total;
     }
-
-    function submitOrder() {
-        let totalQty = 0;
-        menu.forEach(item => { totalQty += (parseInt(document.getElementById(`qty_${item.id}`).value) || 0); });
-        
-        if (totalQty === 0) {
-            alert("您還沒有選擇任何貝果喔！");
-            return;
-        }
-        if (!document.getElementById('customer_name').value || !document.getElementById('phone').value) {
-            alert("請填寫姓名與聯絡電話！");
-            return;
-        }
-
-        const btn = document.getElementById('submitBtn');
-        btn.disabled = true;
-
-        // 🌟 UX 魔法：每 1.2 秒換一句話，轉移客人注意力
-        const loadingMessages = [
-            "🥯 正在打包您的貝果...", 
-            "📡 呼叫暖甜間店長中...", 
-            "📝 正在寫入訂單資料...", 
-            "✨ 就快要完成囉..."
-        ];
-        let msgIndex = 0;
-        btn.innerText = loadingMessages[msgIndex];
-        
-        const loadingTimer = setInterval(() => {
-            msgIndex++;
-            if(msgIndex < loadingMessages.length) {
-                btn.innerText = loadingMessages[msgIndex];
-            }
-        }, 1200); // 1200毫秒換一次字
-
-        const orderData = {
-            line_user_id: document.getElementById('line_user_id').value,
-            customer_name: document.getElementById('customer_name').value,
-            phone: document.getElementById('phone').value,
-            delivery_date: document.getElementById('delivery_date').value,
-            shipping_method: document.getElementById('shipping_method').value,
-            note: document.getElementById('note').value,
-            flavors: {}
-        };
-        
-        menu.forEach(item => {
-            orderData.flavors[item.id] = parseInt(document.getElementById(`qty_${item.id}`).value) || 0;
-        });
-
-        // 傳送資料到 Google
-        fetch(GOOGLE_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(orderData),
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            clearInterval(loadingTimer); // 停止換字
-            if (data.status === "success") {
-                btn.innerText = "✅ 訂單送出成功！";
-                btn.style.backgroundColor = "#4CAF50"; // 按鈕變綠色
-                
-                setTimeout(() => {
-                    alert("🎉 訂單已成功送出！請稍候，我們會盡快與您聯繫。");
-                    if (liff.isLoggedIn()) {
-                        liff.closeWindow();
-                    } else {
-                        window.location.reload();
-                    }
-                }, 500);
-            } else {
-                alert("❌ 傳送失敗，請稍後再試。原因：" + data.message);
-                btn.innerText = "重新送出訂單";
-                btn.disabled = false;
-            }
-        })
-        .catch(error => {
-            clearInterval(loadingTimer);
-            alert("❌ 網路連線發生錯誤，請檢查網路或稍後再試！");
-            console.error('Error:', error);
-            btn.innerText = "重新送出訂單";
-            btn.disabled = false;
-        });
-    }
+    
+    // (其他 submitOrder 內收集資料的邏輯，將原本固定口味改為 loop dynamicMenu 即可)
 </script>
 
 </body>
