@@ -202,39 +202,55 @@
     // 全域變數，用來存放從 Google Sheet 抓來的最新菜單
     let dynamicMenu = [];
 
-    // --- 1. 網頁開啟時的自動化動作 ---
+// --- 1. 網頁開啟時的自動化動作 ---
     window.onload = function() {
         setupDate();
         initializeLiff();
         
         const btn = document.getElementById('submitBtn');
-        btn.disabled = true;
 
-        // 向你的 Google 橋樑請求「狀態」與「最新菜單」
+        // 🌟 終極魔法：檢查手機裡有沒有「上次記憶的菜單」
+        const cachedMenu = localStorage.getItem('sweetroom_menu');
+        if (cachedMenu) {
+            // 如果有記憶，0.1 秒瞬間畫出菜單，讓客人可以直接開始點！
+            dynamicMenu = JSON.parse(cachedMenu);
+            renderDynamicMenu(dynamicMenu);
+            btn.innerText = "送出訂單";
+            btn.disabled = false;
+        } else {
+            // 如果是新客人第一次來，按鈕先鎖住稍微等一下
+            btn.disabled = true;
+        }
+
+        // 不管有沒有記憶，都在「背景」偷偷去向 Google 橋樑確認最新狀態
         fetch(GOOGLE_SCRIPT_URL)
             .then(response => response.json())
             .then(data => {
-                // 判斷鐵捲門是否有開
+                // 如果老闆剛剛拉下鐵捲門，立刻蓋掉畫面顯示休息中
                 if (data.store_status !== "營業中") {
                     showClosedMessage();
                     return;
                 }
                 
-                // 將抓到的菜單存起來，並畫在畫面上
+                // 把最新拿到的菜單，更新到手機的記憶體裡，確保下次還是最新的
+                localStorage.setItem('sweetroom_menu', JSON.stringify(data.menu));
+                
+                // 為了怕老闆剛好改了價格或口味，背景確認完後「悄悄」再刷新一次菜單
                 dynamicMenu = data.menu; 
                 renderDynamicMenu(dynamicMenu);
 
-                // 解鎖送出按鈕
+                // 解鎖按鈕
                 btn.innerText = "送出訂單";
                 btn.disabled = false;
             })
             .catch(err => {
                 console.error("菜單讀取失敗:", err);
-                document.getElementById('menu-container').innerHTML = "<p style='color:red; text-align:center;'>菜單讀取異常，請重新整理網頁再試一次。</p>";
-                btn.innerText = "連線失敗";
+                if (!cachedMenu) {
+                    document.getElementById('menu-container').innerHTML = "<p style='color:red; text-align:center;'>菜單讀取異常，請重新整理網頁再試一次。</p>";
+                    btn.innerText = "連線失敗";
+                }
             });
     };
-
     // --- 鐵捲門拉下的畫面 ---
     function showClosedMessage() {
         document.body.innerHTML = `
