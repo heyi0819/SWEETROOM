@@ -141,7 +141,7 @@
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="main-container">
     <h1>🥯 暖甜間 專屬訂購</h1>
     <p class="subtitle">新鮮手作，用心烘焙</p>
 
@@ -164,7 +164,9 @@
 
     <div class="form-group">
         <label>🥯 選擇口味與數量</label>
-        <div id="menu-container"></div>
+        <div id="menu-container">
+            <p style="text-align: center; color: #888; padding: 20px 0;">🔄 正在為您端出最新菜單...</p>
+        </div>
     </div>
 
     <div class="form-group">
@@ -172,7 +174,7 @@
         <select id="shipping_method">
             <option value="面交">面交</option>
             <option value="店到店">店到店 (請在備註填寫縣市與門市)</option>
-            <option value="黑貓低溫宅配">黑貓低溫宅配(請在備註填寫收件人姓名/收件地址)</option>
+            <option value="黑貓低溫宅配">黑貓低溫宅配</option>
         </select>
     </div>
 
@@ -190,40 +192,91 @@
         總金額：$<span id="total_price_display">0</span>
     </div>
 
-    <button class="submit-btn" id="submitBtn" onclick="submitOrder()">送出訂單</button>
+    <button class="submit-btn" id="submitBtn" onclick="submitOrder()">🔄 系統連線中...</button>
 </div>
 
 <script>
-  let dynamicMenu = []; // 用來存儲從 Google 抓來的菜單
+    // 這裡是你專屬的 GAS 橋樑網址
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6GmRc5vhGbwpCruBOVgsRbAJrFZf3GW4m4PAjn_MCV-MvNT--KBo3mXu_5h9TrUTm/exec";
+    
+    // 全域變數，用來存放從 Google Sheet 抓來的最新菜單
+    let dynamicMenu = [];
 
+    // --- 1. 網頁開啟時的自動化動作 ---
     window.onload = function() {
+        setupDate();
+        initializeLiff();
+        
         const btn = document.getElementById('submitBtn');
-        btn.innerText = "🔄 讀取最新菜單中...";
         btn.disabled = true;
 
-        // 向大腦請求目前的菜單和營業狀態
+        // 向你的 Google 橋樑請求「狀態」與「最新菜單」
         fetch(GOOGLE_SCRIPT_URL)
             .then(response => response.json())
             .then(data => {
+                // 判斷鐵捲門是否有開
                 if (data.store_status !== "營業中") {
                     showClosedMessage();
                     return;
                 }
                 
-                // 核心連動：自動畫出菜單
+                // 將抓到的菜單存起來，並畫在畫面上
                 dynamicMenu = data.menu; 
                 renderDynamicMenu(dynamicMenu);
-                setupDate();
-                initializeLiff();
 
+                // 解鎖送出按鈕
                 btn.innerText = "送出訂單";
                 btn.disabled = false;
+            })
+            .catch(err => {
+                console.error("菜單讀取失敗:", err);
+                document.getElementById('menu-container').innerHTML = "<p style='color:red; text-align:center;'>菜單讀取異常，請重新整理網頁再試一次。</p>";
+                btn.innerText = "連線失敗";
             });
     };
 
+    // --- 鐵捲門拉下的畫面 ---
+    function showClosedMessage() {
+        document.body.innerHTML = `
+            <div style="max-width: 400px; margin: 50px auto; text-align: center; background: #FEFAE0; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                <h1 style="color: #D4A373; margin-bottom: 10px;">🛑 暫停接單中</h1>
+                <p style="color: #5E503F; font-size: 16px; line-height: 1.5;">
+                    感謝您的支持！<br>目前訂單已滿，或店長正在專心烘焙中。<br>下次開放時間請留意粉絲專頁公告喔！🥯
+                </p>
+            </div>
+        `;
+    }
+
+    // --- 初始化 LIFF ---
+    function initializeLiff() {
+        liff.init({ liffId: "2009466422-vSvBojn2" })
+            .then(() => {
+                if (liff.isLoggedIn()) {
+                    liff.getProfile().then(profile => {
+                        document.getElementById('customer_name').value = profile.displayName;
+                        document.getElementById('line_user_id').value = profile.userId;
+                    });
+                }
+            })
+            .catch((err) => { console.log('LIFF 初始化失敗', err); });
+    }
+
+    // --- 設定交貨日期 (自動 +3 天) ---
+    function setupDate() {
+        const today = new Date();
+        const minDate = new Date(today);
+        minDate.setDate(minDate.getDate() + 3); 
+        const minDateString = minDate.toISOString().split('T')[0];
+        const dateInput = document.getElementById('delivery_date');
+        dateInput.min = minDateString; 
+        dateInput.value = minDateString; 
+    }
+
+    // --- 動態畫出菜單 ---
     function renderDynamicMenu(menuItems) {
         const container = document.getElementById('menu-container');
-        container.innerHTML = ""; // 清空舊的
+        container.innerHTML = ""; // 清空載入中文字
+        
         menuItems.forEach(item => {
             const html = `
                 <div class="bagel-item">
@@ -242,16 +295,115 @@
         });
     }
 
+    // --- 數量加減與總金額計算 ---
+    function changeQty(name, delta) {
+        const input = document.getElementById(`qty_${name}`);
+        let currentVal = parseInt(input.value) || 0;
+        let newVal = currentVal + delta;
+        if (newVal < 0) newVal = 0; 
+        input.value = newVal;
+        calculateTotal();
+    }
+
     function calculateTotal() {
         let total = 0;
+        // 依照從 Google 抓來的菜單，一個一個去算錢
         dynamicMenu.forEach(item => {
             const qty = parseInt(document.getElementById(`qty_${item.name}`).value) || 0;
             total += qty * item.price;
         });
         document.getElementById('total_price_display').innerText = total;
     }
-    
-    // (其他 submitOrder 內收集資料的邏輯，將原本固定口味改為 loop dynamicMenu 即可)
+
+    // --- 收集資料並送出訂單 ---
+    function submitOrder() {
+        let totalQty = 0;
+        dynamicMenu.forEach(item => { 
+            totalQty += (parseInt(document.getElementById(`qty_${item.name}`).value) || 0); 
+        });
+        
+        if (totalQty === 0) {
+            alert("您還沒有選擇任何貝果喔！");
+            return;
+        }
+        if (!document.getElementById('customer_name').value || !document.getElementById('phone').value) {
+            alert("請填寫姓名與聯絡電話！");
+            return;
+        }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+
+        // 動態文字魔法
+        const loadingMessages = [
+            "🥯 正在打包您的貝果...", 
+            "📡 呼叫暖甜間店長中...", 
+            "📝 正在寫入訂單資料...", 
+            "✨ 就快要完成囉..."
+        ];
+        let msgIndex = 0;
+        btn.innerText = loadingMessages[msgIndex];
+        
+        const loadingTimer = setInterval(() => {
+            msgIndex++;
+            if(msgIndex < loadingMessages.length) {
+                btn.innerText = loadingMessages[msgIndex];
+            }
+        }, 1200);
+
+        // 打包所有資料
+        const orderData = {
+            line_user_id: document.getElementById('line_user_id').value,
+            customer_name: document.getElementById('customer_name').value,
+            phone: document.getElementById('phone').value,
+            delivery_date: document.getElementById('delivery_date').value,
+            shipping_method: document.getElementById('shipping_method').value,
+            note: document.getElementById('note').value,
+            flavors: {}
+        };
+        
+        // 抓取每一種動態口味的訂購數量
+        dynamicMenu.forEach(item => {
+            orderData.flavors[item.name] = parseInt(document.getElementById(`qty_${item.name}`).value) || 0;
+        });
+
+        // 傳送資料
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(orderData),
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            clearInterval(loadingTimer); 
+            if (data.status === "success") {
+                btn.innerText = "✅ 訂單送出成功！";
+                btn.style.backgroundColor = "#4CAF50"; 
+                
+                setTimeout(() => {
+                    alert("🎉 訂單已成功送出！請稍候，我們會盡快與您聯繫。");
+                    if (liff.isLoggedIn()) {
+                        liff.closeWindow(); // 關閉 LINE 網頁
+                    } else {
+                        window.location.reload(); // 重新整理瀏覽器
+                    }
+                }, 500);
+            } else {
+                alert("❌ 傳送失敗，請稍後再試。原因：" + data.message);
+                btn.innerText = "重新送出訂單";
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            clearInterval(loadingTimer);
+            alert("❌ 網路連線發生錯誤，請檢查網路或稍後再試！");
+            console.error('Error:', error);
+            btn.innerText = "重新送出訂單";
+            btn.disabled = false;
+        });
+    }
 </script>
 
 </body>
